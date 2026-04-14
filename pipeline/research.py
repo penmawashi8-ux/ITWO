@@ -33,6 +33,29 @@ def mark_used(term: str) -> None:
         json.dump(terms, f, ensure_ascii=False, indent=2)
 
 
+def _extract_text(data: dict) -> str:
+    """Geminiレスポンスからテキストを抽出する（parts構造・直接text両対応）"""
+    candidate = data["candidates"][0]
+    content = candidate.get("content", {})
+
+    if "parts" in content:
+        # 思考モデル: thought=True のpartを除いた最後のtextを使う
+        text_parts = [p["text"] for p in content["parts"] if not p.get("thought") and "text" in p]
+        raw = text_parts[-1] if text_parts else content["parts"][-1].get("text", "")
+    elif "text" in content:
+        raw = content["text"]
+    else:
+        raise ValueError(f"不明なレスポンス構造: {list(content.keys())}")
+
+    # markdownコードブロックを除去
+    raw = raw.strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        inner = [l for l in lines[1:] if l.strip() != "```"]
+        raw = "\n".join(inner).strip()
+    return raw
+
+
 def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
     """Gemini REST APIを呼び出す（リトライなし・エラー詳細ログ付き）"""
     api_key = os.environ["GEMINI_API_KEY"]
@@ -44,10 +67,7 @@ def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": max_tokens,
-            "responseMimeType": "application/json",
-        },
+        "generationConfig": {"maxOutputTokens": max_tokens},
     }
 
     resp = requests.post(
@@ -63,13 +83,9 @@ def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
         resp.raise_for_status()
 
     data = resp.json()
-    parts = data["candidates"][0]["content"]["parts"]
-    print(f"[Gemini] parts数: {len(parts)}")
-    for i, p in enumerate(parts):
-        snippet = p.get("text", "")[:100].replace("\n", "\\n")
-        print(f"[Gemini] parts[{i}]: thought={p.get('thought', False)} text='{snippet}'")
-    # 思考モデルは parts[-1] が実際の回答
-    raw = parts[-1]["text"].strip()
+    print(f"[Gemini] レスポンス全体: {json.dumps(data, ensure_ascii=False)[:600]}")
+    raw = _extract_text(data)
+    print(f"[Gemini] 抽出テキスト: {raw[:200]}")
     return raw
 
 
