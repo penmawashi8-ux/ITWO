@@ -4,31 +4,47 @@ Gemini APIで用語の解説コンテンツを生成する
 """
 import json
 import os
+import time
 
-import google.generativeai as genai
 from dotenv import load_dotenv
+from google import genai
 
 load_dotenv()
 
-MODEL = "gemini-2.0-flash"
-
-
-def _get_model() -> genai.GenerativeModel:
-    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    return genai.GenerativeModel(MODEL)
+MODEL = "gemini-2.0-flash-lite"
+MAX_RETRIES = 4
 
 
 def _call(prompt: str, max_tokens: int = 512) -> str:
-    model = _get_model()
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.types.GenerationConfig(max_output_tokens=max_tokens),
-    )
-    raw = response.text.strip()
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-    return raw
+    """クォータエラー時に指数バックオフでリトライする"""
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    wait = 60
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config={"max_output_tokens": max_tokens},
+            )
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                lines = raw.splitlines()
+                raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+            return raw
+        except Exception as e:
+            if "429" in str(e) or "ResourceExhausted" in str(e):
+                if attempt < MAX_RETRIES - 1:
+                    print(f"クォータ超過。{wait}秒後にリトライします... ({attempt + 1}/{MAX_RETRIES})")
+                    time.sleep(wait)
+                    wait *= 2
+                else:
+                    raise RuntimeError(
+                        "Gemini APIのクォータを超過しました。しばらく時間をおいてから再実行してください。\n"
+                        "無料枠の上限に達した可能性があります。Google AI Studioで使用状況を確認してください。"
+                    ) from e
+            else:
+                raise
+    raise RuntimeError("リトライ上限に達しました")
 
 
 def generate(term: str) -> dict:
