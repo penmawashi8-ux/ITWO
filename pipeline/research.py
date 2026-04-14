@@ -63,7 +63,13 @@ def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
         resp.raise_for_status()
 
     data = resp.json()
-    raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    parts = data["candidates"][0]["content"]["parts"]
+    print(f"[Gemini] parts数: {len(parts)}")
+    for i, p in enumerate(parts):
+        snippet = p.get("text", "")[:100].replace("\n", "\\n")
+        print(f"[Gemini] parts[{i}]: thought={p.get('thought', False)} text='{snippet}'")
+    # 思考モデルは parts[-1] が実際の回答
+    raw = parts[-1]["text"].strip()
     return raw
 
 
