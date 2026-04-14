@@ -4,7 +4,6 @@ Gemini REST APIで用語の解説コンテンツを生成する
 """
 import json
 import os
-import time
 
 import requests
 from dotenv import load_dotenv
@@ -23,40 +22,26 @@ def _call_gemini(prompt: str, max_tokens: int = 512) -> str:
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens},
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "responseMimeType": "application/json",
+        },
     }
 
-    wait = 60
-    for attempt in range(MAX_RETRIES):
-        resp = requests.post(
-            url,
-            params={"key": api_key},
-            json=payload,
-            timeout=30,
-        )
+    resp = requests.post(
+        url,
+        params={"key": api_key},
+        json=payload,
+        timeout=30,
+    )
 
-        if resp.status_code == 429:
-            if attempt < MAX_RETRIES - 1:
-                print(f"クォータ超過。{wait}秒後にリトライします... ({attempt + 1}/{MAX_RETRIES})")
-                time.sleep(wait)
-                wait *= 2
-                continue
-            else:
-                raise RuntimeError(
-                    "Gemini APIのクォータを超過しました。\n"
-                    "しばらく時間をおいてから再実行するか、Google AI Studioで使用状況を確認してください。"
-                )
-
+    if not resp.ok:
+        print(f"[Gemini] エラーレスポンス:\n{resp.text}")
         resp.raise_for_status()
-        data = resp.json()
-        raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-        if raw.startswith("```"):
-            lines = raw.splitlines()
-            raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-        return raw
-
-    raise RuntimeError("リトライ上限に達しました")
+    data = resp.json()
+    raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    return raw
 
 
 def generate(term: str) -> dict:
