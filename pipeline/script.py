@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_RETRIES = 4
 
 
