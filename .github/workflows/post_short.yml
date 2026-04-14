@@ -1,0 +1,59 @@
+name: Post YouTube Short
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 毎日 JST 10:00（UTC 01:00）
+  workflow_dispatch:
+
+jobs:
+  generate-and-post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Start VOICEVOX engine
+        run: |
+          docker run -d --rm \
+            -p 50021:50021 \
+            voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+          sleep 15
+
+      - name: Write credentials
+        env:
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_TOKEN: ${{ secrets.YOUTUBE_TOKEN }}
+        run: |
+          echo "$YOUTUBE_CLIENT_SECRET" > client_secret.json
+          echo "$YOUTUBE_TOKEN" > token.json
+
+      - name: Run pipeline
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VOICEVOX_URL: http://localhost:50021
+          TEST_MODE: "false"
+          YOUTUBE_CLIENT_SECRET_PATH: ./client_secret.json
+          YOUTUBE_TOKEN_PATH: ./token.json
+        run: python main.py
+
+      - name: Commit updated used_terms.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add used_terms.json
+          git diff --staged --quiet || \
+            git commit -m "chore: add posted term [skip ci]"
+          git push
