@@ -15,6 +15,21 @@ OUTPUT_DIR = Path("output")
 
 TEST_MODE = os.getenv("TEST_MODE", "false").lower() == "true"
 FORCE_TERM = os.getenv("FORCE_TERM", "").strip()
+MOCK_SCRIPT = os.getenv("MOCK_SCRIPT", "false").lower() == "true"
+
+# API不要のサンプルデータ（MOCK_SCRIPT=true 時に使用）
+_MOCK_DATA = {
+    "term": "生成AI",
+    "term_en": "Generative AI",
+    "definition": "テキスト・画像・動画などを自動生成するAI技術",
+    "use_case": "議事録の自動要約やコード補完ツールに活用されている",
+    "point": "人間の指示で新コンテンツを生成",
+    "narration": (
+        "生成AIとは、テキストや画像などを自動で生成するAI技術です。"
+        "ChatGPTやGeminiなどが代表例で、業務効率化やコンテンツ制作に広く活用されています。"
+        "今後もDX推進の中核技術として注目が続きます。"
+    ),
+}
 
 
 def run() -> None:
@@ -22,18 +37,23 @@ def run() -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # ---- 1. 用語選定 ----
-    if FORCE_TERM:
-        term = FORCE_TERM
-        print(f"[FORCE_TERM] 用語を指定: {term}")
+    if MOCK_SCRIPT:
+        print("[MOCK_SCRIPT] Gemini APIをスキップし、サンプルデータを使用します")
+        data = _MOCK_DATA.copy()
+        term = data["term"]
     else:
-        print("用語を選定中...")
-        term = research.pick_term()
-        print(f"選定用語: {term}")
+        # ---- 1. 用語選定 ----
+        if FORCE_TERM:
+            term = FORCE_TERM
+            print(f"[FORCE_TERM] 用語を指定: {term}")
+        else:
+            print("用語を選定中...")
+            term = research.pick_term()
+            print(f"選定用語: {term}")
 
-    # ---- 2. スクリプト生成 ----
-    print("スクリプトを生成中...")
-    data = script.generate(term)
+        # ---- 2. スクリプト生成 ----
+        print("スクリプトを生成中...")
+        data = script.generate(term)
 
     script_path = OUTPUT_DIR / "script.json"
     with open(script_path, "w", encoding="utf-8") as f:
@@ -56,11 +76,13 @@ def run() -> None:
     if TEST_MODE:
         print("\n" + "=" * 50)
         print("TEST MODE: YouTubeへの投稿はスキップしました")
+        if MOCK_SCRIPT:
+            print("MOCK_SCRIPT: Gemini APIは使用していません")
         print("=" * 50)
-        print(f"用語:       {data['term']} ({data['term_en']})")
-        print(f"定義:       {data['definition']}")
-        print(f"活用例:     {data['use_case']}")
-        print(f"ポイント:   {data['point']}")
+        print(f"用語:         {data['term']} ({data['term_en']})")
+        print(f"定義:         {data['definition']}")
+        print(f"活用例:       {data['use_case']}")
+        print(f"ポイント:     {data['point']}")
         print(f"ナレーション: {data['narration']}")
         print("=" * 50)
         print(f"動画ファイル: {video_path}")
