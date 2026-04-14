@@ -7,6 +7,10 @@ on:
         description: '用語を指定（空欄で自動選定）'
         required: false
         default: ''
+      mock_script:
+        description: 'Gemini APIを使わずサンプルデータでテスト (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   test-generate:
@@ -41,6 +45,7 @@ jobs:
           VOICEVOX_URL: http://localhost:50021
           TEST_MODE: "true"
           FORCE_TERM: ${{ github.event.inputs.term }}
+          MOCK_SCRIPT: ${{ github.event.inputs.mock_script }}
         run: python main.py
 
       - name: Upload Artifact
