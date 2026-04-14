@@ -34,6 +34,7 @@ jobs:
 
       - name: Diagnose Gemini API key
         if: ${{ github.event.inputs.mock_script != 'true' }}
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
@@ -41,9 +42,9 @@ jobs:
           echo "キー長さ: ${#GEMINI_API_KEY} 文字"
           echo "末尾4文字: ...${GEMINI_API_KEY: -4}"
           echo ""
-          echo "=== Gemini API レスポンス ==="
+          echo "=== Gemini API レスポンス (生JSON) ==="
           curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" \
-            | jq '{error: .error, generateContent対応モデル: [.models[]? | select(.supportedGenerationMethods[]? == "generateContent") | .name]}'
+            | jq '{error: .error, models: [.models[]? | select(.supportedGenerationMethods[]? == "generateContent") | .name]}'
 
       - name: Start VOICEVOX engine
         run: |
