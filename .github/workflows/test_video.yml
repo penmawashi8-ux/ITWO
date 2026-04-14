@@ -41,18 +41,9 @@ jobs:
           echo "キー長さ: ${#GEMINI_API_KEY} 文字"
           echo "末尾4文字: ...${GEMINI_API_KEY: -4}"
           echo ""
-          echo "=== 利用可能なモデル一覧 ==="
+          echo "=== Gemini API レスポンス ==="
           curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" \
-            | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-if 'error' in data:
-    print('ERROR:', json.dumps(data['error'], ensure_ascii=False, indent=2))
-else:
-    for m in data.get('models', []):
-        if 'generateContent' in m.get('supportedGenerationMethods', []):
-            print(m['name'])
-"
+            | jq '{error: .error, generateContent対応モデル: [.models[]? | select(.supportedGenerationMethods[]? == "generateContent") | .name]}'
 
       - name: Start VOICEVOX engine
         run: |
