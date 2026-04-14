@@ -11,7 +11,7 @@ from google import genai
 
 load_dotenv()
 
-MODEL = "gemini-2.0-flash-lite"
+MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 MAX_RETRIES = 4
 
 
