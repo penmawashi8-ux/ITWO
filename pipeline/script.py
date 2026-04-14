@@ -14,6 +14,27 @@ MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 MAX_RETRIES = 4
 
 
+def _extract_text(data: dict) -> str:
+    """Geminiレスポンスからテキストを抽出する（parts構造・直接text両対応）"""
+    candidate = data["candidates"][0]
+    content = candidate.get("content", {})
+
+    if "parts" in content:
+        text_parts = [p["text"] for p in content["parts"] if not p.get("thought") and "text" in p]
+        raw = text_parts[-1] if text_parts else content["parts"][-1].get("text", "")
+    elif "text" in content:
+        raw = content["text"]
+    else:
+        raise ValueError(f"不明なレスポンス構造: {list(content.keys())}")
+
+    raw = raw.strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        inner = [l for l in lines[1:] if l.strip() != "```"]
+        raw = "\n".join(inner).strip()
+    return raw
+
+
 def _call_gemini(prompt: str, max_tokens: int = 512) -> str:
     """Gemini REST APIを呼び出す（リトライ付き）"""
     api_key = os.environ["GEMINI_API_KEY"]
@@ -22,10 +43,7 @@ def _call_gemini(prompt: str, max_tokens: int = 512) -> str:
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "maxOutputTokens": max_tokens,
-            "responseMimeType": "application/json",
-        },
+        "generationConfig": {"maxOutputTokens": max_tokens},
     }
 
     resp = requests.post(
@@ -40,9 +58,7 @@ def _call_gemini(prompt: str, max_tokens: int = 512) -> str:
         resp.raise_for_status()
 
     data = resp.json()
-    parts = data["candidates"][0]["content"]["parts"]
-    # 思考モデルは parts[-1] が実際の回答
-    raw = parts[-1]["text"].strip()
+    raw = _extract_text(data)
     return raw
 
 
