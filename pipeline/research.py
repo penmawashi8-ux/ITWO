@@ -67,7 +67,10 @@ def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens},
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
     }
 
     resp = requests.post(
@@ -106,6 +109,6 @@ def pick_term() -> str:
 以下のJSON形式のみで出力してください。前置きや説明は一切不要です。
 {{"term": "用語名"}}"""
 
-    raw = _call_gemini(prompt, max_tokens=64)
+    raw = _call_gemini(prompt, max_tokens=256)
     data = json.loads(raw)
     return data["term"]
