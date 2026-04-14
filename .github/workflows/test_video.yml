@@ -51,7 +51,14 @@ jobs:
           docker run -d --rm \
             -p 50021:50021 \
             voicevox/voicevox_engine:cpu-ubuntu20.04-latest
-          sleep 15
+          echo "VOICEVOX起動待機中..."
+          for i in $(seq 1 40); do
+            if curl -s http://localhost:50021/version > /dev/null 2>&1; then
+              echo "VOICEVOX起動完了（${i}秒経過）"
+              break
+            fi
+            sleep 2
+          done
 
       - name: Run pipeline (TEST MODE)
         env:
@@ -63,6 +70,7 @@ jobs:
         run: python main.py
 
       - name: Upload Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-video-${{ github.run_number }}
@@ -73,4 +81,5 @@ jobs:
           retention-days: 7
 
       - name: Show generated script
-        run: cat output/script.json
+        if: always()
+        run: cat output/script.json 2>/dev/null || echo "script.json が存在しません"
