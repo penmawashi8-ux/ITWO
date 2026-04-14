@@ -34,47 +34,38 @@ def mark_used(term: str) -> None:
 
 
 def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
-    """Gemini REST APIを呼び出す（リトライ付き）"""
+    """Gemini REST APIを呼び出す（リトライなし・エラー詳細ログ付き）"""
     api_key = os.environ["GEMINI_API_KEY"]
     model = os.getenv("GEMINI_MODEL", MODEL)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    print(f"[Gemini] モデル: {model}")
+    print(f"[Gemini] APIキー末尾4文字: ...{api_key[-4:]}")
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"maxOutputTokens": max_tokens},
     }
 
-    wait = 60
-    for attempt in range(MAX_RETRIES):
-        resp = requests.post(
-            url,
-            params={"key": api_key},
-            json=payload,
-            timeout=30,
-        )
+    resp = requests.post(
+        url,
+        params={"key": api_key},
+        json=payload,
+        timeout=30,
+    )
 
-        if resp.status_code == 429:
-            if attempt < MAX_RETRIES - 1:
-                print(f"クォータ超過。{wait}秒後にリトライします... ({attempt + 1}/{MAX_RETRIES})")
-                time.sleep(wait)
-                wait *= 2
-                continue
-            else:
-                raise RuntimeError(
-                    "Gemini APIのクォータを超過しました。\n"
-                    "しばらく時間をおいてから再実行するか、Google AI Studioで使用状況を確認してください。"
-                )
-
+    print(f"[Gemini] ステータスコード: {resp.status_code}")
+    if not resp.ok:
+        print(f"[Gemini] エラーレスポンス:\n{resp.text}")
         resp.raise_for_status()
-        data = resp.json()
-        raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-        if raw.startswith("```"):
-            lines = raw.splitlines()
-            raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-        return raw
+    data = resp.json()
+    raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-    raise RuntimeError("リトライ上限に達しました")
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+    return raw
 
 
 def pick_term() -> str:

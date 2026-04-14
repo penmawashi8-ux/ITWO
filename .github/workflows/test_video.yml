@@ -32,6 +32,28 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Diagnose Gemini API key
+        if: ${{ github.event.inputs.mock_script != 'true' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "=== API Key診断 ==="
+          echo "キー長さ: ${#GEMINI_API_KEY} 文字"
+          echo "末尾4文字: ...${GEMINI_API_KEY: -4}"
+          echo ""
+          echo "=== 利用可能なモデル一覧 ==="
+          curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY" \
+            | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+if 'error' in data:
+    print('ERROR:', json.dumps(data['error'], ensure_ascii=False, indent=2))
+else:
+    for m in data.get('models', []):
+        if 'generateContent' in m.get('supportedGenerationMethods', []):
+            print(m['name'])
+"
+
       - name: Start VOICEVOX engine
         run: |
           docker run -d --rm \
