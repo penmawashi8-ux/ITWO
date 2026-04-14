@@ -1,21 +1,39 @@
 """
 スクリプト生成モジュール
-Claude APIで用語の解説コンテンツを生成する
+Gemini APIで用語の解説コンテンツを生成する
 """
 import json
 import os
 
-import anthropic
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "gemini-2.0-flash"
+
+
+def _get_model() -> genai.GenerativeModel:
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    return genai.GenerativeModel(MODEL)
+
+
+def _call(prompt: str, max_tokens: int = 512) -> str:
+    model = _get_model()
+    response = model.generate_content(
+        prompt,
+        generation_config=genai.types.GenerationConfig(max_output_tokens=max_tokens),
+    )
+    raw = response.text.strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+    return raw
 
 
 def generate(term: str) -> dict:
     """
-    Claude APIで用語の解説コンテンツを生成する
+    Gemini APIで用語の解説コンテンツを生成する
 
     Returns:
         dict with keys: term, term_en, definition, use_case, point, narration
@@ -45,20 +63,7 @@ def generate(term: str) -> dict:
 - narration は「{term}とは、」から始めること
 - すべての値は日本語（term_en のみ英語）"""
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    message = client.messages.create(
-        model=MODEL,
-        max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    raw = message.content[0].text.strip()
-    # コードブロックがあれば除去
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-
-    data = json.loads(raw)
+    data = json.loads(_call(prompt))
 
     required_keys = {"term", "term_en", "definition", "use_case", "point", "narration"}
     missing = required_keys - data.keys()
@@ -70,7 +75,7 @@ def generate(term: str) -> dict:
 
 def generate_metadata(data: dict) -> dict:
     """
-    Claude APIでYouTube投稿用のタイトル・説明文・タグを生成する
+    Gemini APIでYouTube投稿用のタイトル・説明文・タグを生成する
 
     Returns:
         dict with keys: title, description, tags
@@ -99,16 +104,4 @@ def generate_metadata(data: dict) -> dict:
 - description は200字以内、ITエンジニア向けに分かりやすく
 - tags は5〜10個、関連するIT用語・技術キーワードを含める"""
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    message = client.messages.create(
-        model=MODEL,
-        max_tokens=512,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    raw = message.content[0].text.strip()
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-
-    return json.loads(raw)
+    return json.loads(_call(prompt))

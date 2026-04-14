@@ -37,7 +37,7 @@ jobs:
 
       - name: Run pipeline (TEST MODE)
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           VOICEVOX_URL: http://localhost:50021
           TEST_MODE: "true"
           FORCE_TERM: ${{ github.event.inputs.term }}

@@ -1,18 +1,18 @@
 """
 用語リサーチモジュール
-Claude APIを使って最新IT用語を1つ選定する
+Gemini APIを使って最新IT用語を1つ選定する
 """
 import json
 import os
 from pathlib import Path
 
-import anthropic
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
 
 USED_TERMS_PATH = Path(__file__).parent.parent / "used_terms.json"
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "gemini-2.0-flash"
 
 
 def _load_used_terms() -> list[str]:
@@ -32,7 +32,7 @@ def mark_used(term: str) -> None:
 
 
 def pick_term() -> str:
-    """Claude APIを使って最新IT用語を1つ選定して返す"""
+    """Gemini APIを使って最新IT用語を1つ選定して返す"""
     used_terms = _load_used_terms()
     exclude_list = "、".join(used_terms) if used_terms else "（なし）"
 
@@ -48,14 +48,11 @@ def pick_term() -> str:
 以下のJSON形式のみで出力してください。前置きや説明は一切不要です。
 {{"term": "用語名"}}"""
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    message = client.messages.create(
-        model=MODEL,
-        max_tokens=64,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    model = genai.GenerativeModel(MODEL)
+    response = model.generate_content(prompt)
 
-    raw = message.content[0].text.strip()
+    raw = response.text.strip()
     # コードブロックがあれば除去
     if raw.startswith("```"):
         lines = raw.splitlines()
