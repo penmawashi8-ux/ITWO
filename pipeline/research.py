@@ -1,14 +1,14 @@
 """
 用語リサーチモジュール
-Gemini APIを使って最新IT用語を1つ選定する
+Gemini REST APIを使って最新IT用語を1つ選定する
 """
 import json
 import os
 import time
 from pathlib import Path
 
+import requests
 from dotenv import load_dotenv
-from google import genai
 
 load_dotenv()
 
@@ -33,35 +33,47 @@ def mark_used(term: str) -> None:
         json.dump(terms, f, ensure_ascii=False, indent=2)
 
 
-def _generate_with_retry(prompt: str, max_tokens: int = 64) -> str:
-    """クォータエラー時に指数バックオフでリトライする"""
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
+    """Gemini REST APIを呼び出す（リトライ付き）"""
+    api_key = os.environ["GEMINI_API_KEY"]
+    model = os.getenv("GEMINI_MODEL", MODEL)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": max_tokens},
+    }
+
     wait = 60
     for attempt in range(MAX_RETRIES):
-        try:
-            response = client.models.generate_content(
-                model=MODEL,
-                contents=prompt,
-                config={"max_output_tokens": max_tokens},
-            )
-            raw = response.text.strip()
-            if raw.startswith("```"):
-                lines = raw.splitlines()
-                raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-            return raw
-        except Exception as e:
-            if "429" in str(e) or "ResourceExhausted" in str(e):
-                if attempt < MAX_RETRIES - 1:
-                    print(f"クォータ超過。{wait}秒後にリトライします... ({attempt + 1}/{MAX_RETRIES})")
-                    time.sleep(wait)
-                    wait *= 2
-                else:
-                    raise RuntimeError(
-                        "Gemini APIのクォータを超過しました。しばらく時間をおいてから再実行してください。\n"
-                        "無料枠の上限に達した可能性があります。Google AI Studioで使用状況を確認してください。"
-                    ) from e
+        resp = requests.post(
+            url,
+            params={"key": api_key},
+            json=payload,
+            timeout=30,
+        )
+
+        if resp.status_code == 429:
+            if attempt < MAX_RETRIES - 1:
+                print(f"クォータ超過。{wait}秒後にリトライします... ({attempt + 1}/{MAX_RETRIES})")
+                time.sleep(wait)
+                wait *= 2
+                continue
             else:
-                raise
+                raise RuntimeError(
+                    "Gemini APIのクォータを超過しました。\n"
+                    "しばらく時間をおいてから再実行するか、Google AI Studioで使用状況を確認してください。"
+                )
+
+        resp.raise_for_status()
+        data = resp.json()
+        raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+        if raw.startswith("```"):
+            lines = raw.splitlines()
+            raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+        return raw
+
     raise RuntimeError("リトライ上限に達しました")
 
 
@@ -82,6 +94,6 @@ def pick_term() -> str:
 以下のJSON形式のみで出力してください。前置きや説明は一切不要です。
 {{"term": "用語名"}}"""
 
-    raw = _generate_with_retry(prompt, max_tokens=64)
+    raw = _call_gemini(prompt, max_tokens=64)
     data = json.loads(raw)
     return data["term"]
