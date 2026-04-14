@@ -40,7 +40,9 @@ def _call_gemini(prompt: str, max_tokens: int = 512) -> str:
         resp.raise_for_status()
 
     data = resp.json()
-    raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    parts = data["candidates"][0]["content"]["parts"]
+    # 思考モデルは parts[-1] が実際の回答
+    raw = parts[-1]["text"].strip()
     return raw
 
 
