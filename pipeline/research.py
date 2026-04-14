@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 USED_TERMS_PATH = Path(__file__).parent.parent / "used_terms.json"
-MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 MAX_RETRIES = 4
 
 
