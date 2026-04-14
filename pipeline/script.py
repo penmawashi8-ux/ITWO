@@ -35,7 +35,7 @@ def _extract_text(data: dict) -> str:
     return raw
 
 
-def _call_gemini(prompt: str, max_tokens: int = 512) -> str:
+def _call_gemini(prompt: str, max_tokens: int = 1024) -> str:
     """Gemini REST APIを呼び出す（リトライ付き）"""
     api_key = os.environ["GEMINI_API_KEY"]
     model = os.getenv("GEMINI_MODEL", MODEL)
@@ -43,7 +43,10 @@ def _call_gemini(prompt: str, max_tokens: int = 512) -> str:
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens},
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
     }
 
     resp = requests.post(
