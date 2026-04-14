@@ -44,7 +44,10 @@ def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": max_tokens},
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "responseMimeType": "application/json",
+        },
     }
 
     resp = requests.post(
@@ -61,10 +64,6 @@ def _call_gemini(prompt: str, max_tokens: int = 256) -> str:
 
     data = resp.json()
     raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-        raw = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
     return raw
 
 
